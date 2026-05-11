@@ -1,0 +1,21 @@
+# Runtime state — never commit
+backups/
+cache/
+.credentials.json
+file-history/
+history.jsonl
+ide/
+paste-cache/
+plans/
+plugins/
+policy-limits.json
+projects/
+session-env/
+sessions/
+shell-snapshots/
+stats-cache.json
+telemetry/
+
+# Python bytecode
+__pycache__/
+*.pyc
