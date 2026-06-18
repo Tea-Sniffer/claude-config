@@ -1,5 +1,5 @@
 ---
-description: Plan an implementation with a reviewer feedback loop. Dispatches a single Plan subagent, then iterates plan ↔ reviewers ↔ user until approved, then writes to plans/<slug>.md. Use /plan-deep for a judge-panel version.
+description: Plan an implementation with a judge panel + reviewer feedback loop. Generates N plans from different angles, scores them, synthesizes a winner, then iterates plan ↔ reviewers ↔ user until approved. Use /plan for a lighter single-agent version.
 argument-hint: <implementation goal>
 ---
 
@@ -9,12 +9,13 @@ $ARGUMENTS
 
 The rules below define a workflow that **persists for the rest of this conversation** — follow them on every subsequent turn, not just this one, until the plan is saved and you explicitly exit planning mode.
 
-## When to use this vs. /plan-deep
+## When to use this vs. /plan
 
-`/plan` dispatches a **single Plan subagent** per iteration — fast and cheap, the
-right default for everyday planning. For high-stakes or wide-solution-space work,
-use `/plan-deep`, which runs a judge panel (N plans from different angles, scored
-and synthesized) through the same reviewer loop.
+`plan-deep` runs the `plan-judge-panel` workflow on every iteration — it drafts
+N plans from different angles, scores them, and synthesizes a winner. That costs
+more tokens and runs longer, but produces a stronger first draft. Use it for
+high-stakes or wide-solution-space work. For everyday planning, use `/plan`,
+which dispatches a single Plan subagent through the same reviewer loop.
 
 ## Setup (turn 1 only)
 
@@ -24,17 +25,19 @@ and synthesized) through the same reviewer loop.
 
 ## Plan dispatch (every iteration)
 
-Generate the plan by dispatching the **`Plan`** subagent (the `Agent` tool with `subagent_type: "Plan"`). Give it everything it needs in the prompt — it holds no state between runs, so include all of:
+Generate the plan by invoking the **`plan-judge-panel`** workflow (the `Workflow` tool with `name: "plan-judge-panel"`). It drafts N plans from different angles, scores them, and synthesizes a winner — this replaces dispatching the Plan subagent directly. Pass everything the planner needs via `args`, in this shape:
 
-- **Goal** — the original ask.
-- **Exploration** — the exploration summary, or a pointer to where it lives in the conversation.
-- **Prior plan** — the most recent plan verbatim, or note that this is the first iteration.
-- **Constraints** — user-locked decisions, accumulated across iterations.
-- **Feedback** — reviewer feedback from the most recent review pass, or note that there is none yet.
+```json
+{
+  "goal": "<original ask>",
+  "exploration": "<exploration summary, or pointer to where it lives in the conversation>",
+  "priorPlan": "<the most recent plan verbatim, or empty on first iteration>",
+  "constraints": "<user-locked decisions, accumulated across iterations>",
+  "feedback": "<reviewer feedback from the most recent review pass, or empty on first iteration>"
+}
+```
 
-Ask the subagent to return a step-by-step plan with: a one-line summary, numbered steps (each with a title, detail, and the files it touches), risks, and any open questions that block planning.
-
-When it returns, **you (Claude) write the file** to `/tmp/plan-<slug>.md` using this structure:
+The workflow returns `{ plan: { summary, steps, openQuestions, risks }, winningAngle, scoreboard }`. When it completes, **you (Claude) write the file** to `/tmp/plan-<slug>.md` using this structure:
 
 ```markdown
 # Plan: <one-line goal>
@@ -49,16 +52,16 @@ When it returns, **you (Claude) write the file** to `/tmp/plan-<slug>.md` using 
 <user-locked decisions, accumulated across iterations>
 
 ## Plan
-<render the steps as a numbered list: each step's title, then its detail; list the files it touches inline where present>
+<render plan.steps as a numbered list: each step's title, then its detail; list step.files inline where present>
 
 ## Risks
-<risks — omit the section if empty>
+<plan.risks — omit the section if empty>
 
 ## Open questions
-<open questions — empty when ready for review>
+<plan.openQuestions — empty when ready for review>
 ```
 
-In conversation, **do not paste the plan**. Report tersely: "Plan written to `/tmp/plan-<slug>.md` — N steps, M open questions."
+In conversation, **do not paste the plan**. Report tersely: "Plan written to `/tmp/plan-<slug>.md` — won on the `<winningAngle>` angle, N steps, M open questions."
 
 ## Branch: open questions
 
@@ -83,8 +86,8 @@ Then ask: approve, or revise?
 
 ## Hard rules — do not violate
 
-- **Never refine the plan yourself.** Always re-dispatch the `Plan` subagent with full context.
-- **The subagent is one-shot.** Every dispatch's prompt includes the full goal, exploration, prior plan, constraints, and latest feedback — it holds no state between runs. There is no SendMessage in this harness.
+- **Never refine the plan yourself.** Always re-invoke the `plan-judge-panel` workflow with full context.
+- **The workflow is one-shot.** Every invocation's `args` includes the full goal, exploration, prior plan, constraints, and latest feedback — it holds no state between runs. There is no SendMessage in this harness.
 - **Reviewers run on every iteration where Open questions is empty** — not just once.
 - **The plan file is the source of truth.** Overwrite `/tmp/plan-<slug>.md` on each iteration; reviewers always read the latest.
 - **Implementation is NOT part of this command.** After save, tell the user to start a new turn to implement. Do not write code in planning mode.
