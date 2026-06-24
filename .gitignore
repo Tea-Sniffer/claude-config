@@ -16,6 +16,14 @@ shell-snapshots/
 stats-cache.json
 telemetry/
 mcp-needs-auth-cache.json
+tasks/
+daemon/
+daemon.lock
+daemon.log
+daemon.status.json
+jobs/
+.last-cleanup
+.ponytail-active
 
 # Python bytecode
 __pycache__/

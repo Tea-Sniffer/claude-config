@@ -12,6 +12,10 @@
     "mode": "hold"
   },
   "skipWorkflowUsageWarning": true,
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"/home/peliraph/.claude/plugins/cache/ponytail/ponytail/4.0.0/hooks/ponytail-statusline.sh\""
+  },
   "voiceEnabled": true,
   "enabledPlugins": {
     "ponytail@ponytail": true
